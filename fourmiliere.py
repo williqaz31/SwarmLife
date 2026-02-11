@@ -1,6 +1,5 @@
 import random
 from enum import Enum
-
 from matplotlib import pyplot as plt
 
 from individu import Fourmi, Oeuf, Reine
