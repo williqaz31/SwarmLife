@@ -1,0 +1,192 @@
+using System;
+using System.Collections.Generic;
+
+enum Saison
+{
+    HIVER = 1,
+    ETE = 2,
+    PRINTEMPS = 3,
+    AUTOMNE = 4
+}
+
+class Colonie
+{
+    public List<Fourmi> population;
+    public List<Fourmi> fourmi_mortes;
+    public Reine reine;
+
+    public Colonie(int nb_fourmi_debut)
+    {
+        population = new List<Fourmi>();
+        fourmi_mortes = new List<Fourmi>();
+        reine = new Reine();
+
+        for (int i = 0; i < nb_fourmi_debut; i++)
+        {
+            population.Add(new Fourmi());
+        }
+    }
+
+    public void naissance()
+    {
+        population.Add(new Fourmi());
+        Console.WriteLine("naissance");
+    }
+
+    public void mort()
+    {
+        if (population.Count > 0)
+        {
+            fourmi_mortes.Add(population[0]);
+            population.RemoveAt(0);
+        }
+    }
+
+    public void reine_morte()
+    {
+        reine = null;
+    }
+
+    public int pop()
+    {
+        return population.Count + 1;
+    }
+}
+
+class Program
+{
+    // --------------------------------PARAMÈTRES------------------------------------------------------------------------
+    const int DUREE_HIVER = 92;
+    const int DUREE_PRINTEMPS = 91;
+    const int DUREE_ETE = 91;
+    const int DUREE_AUTOMNE = 90;
+
+    static readonly int ANNEE = DUREE_HIVER + DUREE_PRINTEMPS + DUREE_ETE + DUREE_AUTOMNE;
+
+    const int DECALAGE_ANNEE = -183;  // commencer en été
+
+    static int jours_famine = 0;  // compteur de famine consécutive
+
+    const int tau_famine_oeufs = 7;  // seuil après lequel les œufs meurent
+    static bool reine_active = true;  // True si la reine peut pondre
+
+    static int k = 10000;
+    static int r = 0;
+    static Random random = new Random();
+    static int tau = random.Next(21, 43);
+    static int j = 0;
+    static int E_max = 10;
+    static double mortalite = 0.00136;
+
+    static int ini = 4;
+
+    // --------------------------------JOURS------------------------------------------------------------------------
+    static int jours = 6000;
+    // -----------------------------------------------------------------------------------------------------------------
+
+    static int[] P = new int[jours + 1];
+    static List<Oeuf> oeufs = new List<Oeuf>();
+
+    // ------------------------------------------GESTION DE LA NOURRITURE PAR SAISON-----------------------------------------------------------------------------------------------
+    static int stock_nourriture = 50; // mg, réserve initiale
+    static Colonie colonie = new Colonie(ini);
+    static bool limite = true;
+
+    static Saison saison_actuelle(int jour)
+    {
+        int j = (jour + DECALAGE_ANNEE) % ANNEE;
+        if (j < 0) j += ANNEE; // handle negative modulo
+
+        if (j < DUREE_HIVER)
+            return Saison.HIVER;
+        j -= DUREE_HIVER;
+        if (j < DUREE_PRINTEMPS)
+            return Saison.PRINTEMPS;
+        j -= DUREE_PRINTEMPS;
+        if (j < DUREE_ETE)
+            return Saison.ETE;
+        return Saison.AUTOMNE;
+    }
+
+    static (int, int) decision_apport(Saison saison)
+    {
+        // Retourne la quantité de nourriture donnée et la conommation par fourmi pour le jour 'jour'.
+        // Tu peux personnaliser selon la saison, stock, ou stratégie.
+        // Exemple : pas de nourriture en hiver, 2000 mg en été
+
+        if (saison == Saison.HIVER)
+            return (10, 1);  // hiver rude
+        else if (saison == Saison.ETE)
+            return (150, 2);  // été
+        else
+            return (150, 2);  // printemps/automne
+    }
+
+    static double ponte_par_saison(Saison saison)
+    {
+        if (saison == Saison.HIVER)
+            return 0.0;
+        else if (saison == Saison.PRINTEMPS)
+            return 0.065;
+        else if (saison == Saison.ETE)
+            return 1.0;
+        else // AUTOMNE
+            return 0.3;
+    }
+
+    static List<Oeuf> ponte(List<Oeuf> oeufs, double f_espace, Saison saison)
+    {
+        int E_t = (int)Math.Round(E_max * f_espace * ponte_par_saison(saison));
+        List<Oeuf> nouveaux_oeufs = new List<Oeuf>();
+        for (int i = 0; i < E_t; i++)
+        {
+            oeufs.Add(new Oeuf());
+        }
+        foreach (var oeuf in oeufs)
+        {
+            if (oeuf.vieillir())
+            {
+                colonie.naissance();
+            }
+            else
+            {
+                nouveaux_oeufs.Add(oeuf);
+            }
+        }
+        return nouveaux_oeufs;
+    }
+
+    static void Main()
+    {
+        P[0] = ini + 1;
+
+        Saison saison = Saison.HIVER; // initial value to avoid uninitialized usage
+
+        // Boucle des jours
+        for (int t = 0; t < jours; t++)
+        {
+            try
+            {
+                if (saison != saison_actuelle(t))
+                {
+                    Console.WriteLine($"NOUVELLE SAISON {saison_actuelle(t)} jours: {t}");
+                }
+            }
+            catch
+            {
+                // ignore
+            }
+            saison = saison_actuelle(t);
+
+            // --- Nourriture totale disponible ---
+
+            var apportTuple = decision_apport(saison);
+            int apport = apportTuple.Item1;
+            int conso_par_fourmi = apportTuple.Item2;
+            int nourriture_total = stock_nourriture + apport;
+
+            // Calcul la quantité de nourriture qui doit être stocké pour l'hiver
+            int consommation_hiver = DUREE_HIVER * (decision_apport(Saison.HIVER).Item2 * (colonie.pop() + oeufs.Count));
+        }
+    }
+}
